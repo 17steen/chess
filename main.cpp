@@ -306,11 +306,21 @@ main(int argc, char* argv[])
 
     auto game_data = generate_default_game_data();
 
-    while (true) {
+    bool run{ true };
+    while (run) {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            switch (e.type) {
+                case SDL_QUIT: {
+                    run = false;
+                } break;
+            }
+        }
+
         SDL_RenderClear(main_renderer.get());
         render_board(assets, game_data, main_renderer);
         SDL_RenderPresent(main_renderer.get());
-        SDL_Delay(100);
+        SDL_WaitEvent(nullptr);
     }
 }
 
