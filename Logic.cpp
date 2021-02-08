@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstdio>
 #include <filesystem>
@@ -329,25 +330,17 @@ get_moves_pawn(Piece const pc, GameData const& board)
 MoveContainer
 get_moves(Piece const pc, GameData const& context)
 {
-    using namespace PieceType;
 
-    switch (pc.type) {
-        case rook: {
-        } break;
-        case knight: {
-        } break;
-        case bishop: {
-        } break;
-        case queen: {
-        } break;
-        case king: {
-        } break;
-        case pawn: {
-        } break;
-        default: // never reached
-            assert(false);
-    }
+    auto const functions = std::to_array({
+      &get_moves_rook,
+      &get_moves_knight,
+      &get_moves_bishop,
+      &get_moves_queen,
+      &get_moves_king,
+      &get_moves_pawn,
+    });
 
-    return {};
+    // TODO: remove change at into []
+    return functions.at(pc.type)(pc, context);
 }
 

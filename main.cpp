@@ -12,10 +12,6 @@
 #include "CustomDeleters.hpp"
 #include "Pieces.hpp"
 
-constexpr int const refresh_rate = 144;
-constexpr int const width = 800;
-constexpr int const height = 800;
-
 void
 check_sdl_failure(bool b, char const* what)
 {
@@ -110,6 +106,7 @@ struct Assets
       pieces;
 
     SDL_Texture* cursor{};
+    SDL_Texture* board{};
 
     ~Assets()
     {
@@ -119,6 +116,7 @@ struct Assets
             }
         }
 
+        SDL_DestroyTexture(board);
         SDL_DestroyTexture(cursor);
     }
 };
@@ -174,6 +172,16 @@ load_assets(RendererPtr const& renderer)
         assets.cursor = texture;
     }
 
+    // generating board
+    {
+        auto texture =
+          SDL_CreateTextureFromSurface(renderer.get(), generate_board().get());
+
+        check_sdl_failure(not texture, "Texture from board surface");
+
+        assets.board = texture;
+    }
+
     IMG_Quit();
 
     return assets;
@@ -196,7 +204,7 @@ generate_default_game_data()
     for (auto [colour, column, add] :
          { std::tuple{ bool{ black }, 8, 0 }, { white, 1, 8 } }) {
 
-        for (uint8_t i = 0;
+        for (int8_t i = 0;
              auto type :
              { rook, knight, bishop, queen, king, bishop, knight, rook }) {
 
@@ -218,7 +226,7 @@ generate_default_game_data()
     for (auto [colour, column, add] :
          { std::tuple{ bool{ black }, 7, 0 }, { white, 2, 8 } }) {
 
-        for (uint8_t i = A; i <= H; ++i) {
+        for (int8_t i = A; i <= H; ++i) {
 
             int8_t index = 16 + add + i;
 
@@ -234,6 +242,34 @@ generate_default_game_data()
     }
 
     return data;
+}
+
+// TODO: pass in a struct has all necessary information on the window
+void
+render_board(Assets const& assets,
+             GameData const& game_data,
+             RendererPtr& renderer)
+{
+    SDL_Rect tile{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    // TODO: handle screen resize and scale this in a rectangle
+    SDL_Rect screen_rect{ .x = 0, .y = 0, .w = 800, .h = 800 };
+
+    SDL_RenderCopy(renderer.get(), assets.board, nullptr, &screen_rect);
+
+    for (auto const& arr : game_data.board) {
+        for (auto const ptr : arr) {
+            if (ptr != -1) {
+                auto& [type, pos, colour, special] = game_data.pieces[ptr];
+
+                tile.x = pos.col * 100;
+                tile.y = pos.row * 100;
+
+                SDL_RenderCopy(
+                  renderer.get(), assets.pieces[colour][type], nullptr, &tile);
+            }
+        }
+    }
 }
 
 int
@@ -265,39 +301,16 @@ main(int argc, char* argv[])
 
     SDL_SetRenderDrawBlendMode(main_renderer.get(), SDL_BLENDMODE_BLEND);
 
-    SDL_Rect tile{ .x = 0, .y = 0, .w = width / 8, .h = height / 8 };
-
-    // generate 8 * 8 board and turn it into a texture
-    auto const board = to_ptr(SDL_CreateTextureFromSurface(
-      main_renderer.get(), generate_board().get()));
-
-    check_sdl_failure(not board.get(), "Board texture");
-
     // TODO: handle screen resize and scale this in a rectangle
     SDL_Rect screen_rect{ .x = 0, .y = 0, .w = width, .h = height };
 
-    SDL_RenderCopy(main_renderer.get(), board.get(), nullptr, &screen_rect);
-
     auto game_data = generate_default_game_data();
 
-    for (auto const& arr : game_data.board) {
-        for (auto const ptr : arr) {
-            if (ptr != -1) {
-                auto& [type, pos, colour] = game_data.pieces[ptr];
-
-                tile.x = pos.col * 100;
-                tile.y = pos.row * 100;
-
-                SDL_RenderCopy(main_renderer.get(),
-                               assets.pieces[colour][type],
-                               nullptr,
-                               &tile);
-            }
-        }
+    while (true) {
+        SDL_RenderClear(main_renderer.get());
+        render_board(assets, game_data, main_renderer);
+        SDL_RenderPresent(main_renderer.get());
+        SDL_Delay(100);
     }
-
-    SDL_RenderPresent(main_renderer.get());
-
-    std::cin.get();
 }
 
