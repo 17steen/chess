@@ -25,6 +25,7 @@ constexpr auto names =
 namespace LetterColumn {
 // y coordinate is upside down and starts at 1
 constexpr auto Y{ [](int8_t i) -> int8_t { return 8 - i; } };
+
 enum LetterColumn
 {
     A,
@@ -72,14 +73,16 @@ struct GameData
     std::array<Piece, 32> pieces;
     std::array<std::array<int8_t, 8>, 8> board;
 
-    [[nodiscard]] std::optional<Piece> peek(int8_t x, int8_t y) const
+    [[nodiscard]] std::optional<Piece> peek(int8_t const x,
+                                            int8_t const y) const noexcept
     {
-        auto index = board[x][y];
+        auto const index = board[x][y];
         if (index == -1)
             return {};
         else
             return { pieces[index] };
     }
+
     inline void log() const
     {
         for (int y = 0; y < 8; ++y) {

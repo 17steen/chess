@@ -109,8 +109,8 @@ struct Assets
 
     ~Assets()
     {
-        for (auto& arr : pieces) {
-            for (auto* ptr : arr) {
+        for (auto const& arr : pieces) {
+            for (auto* const ptr : arr) {
                 SDL_DestroyTexture(ptr);
             }
         }
@@ -201,14 +201,14 @@ generate_default_game_data()
         for (auto& val : arr)
             val = -1;
 
-    for (auto [colour, column, add] :
+    for (auto const [colour, column, add] :
          { std::tuple{ bool{ black }, 8, 0 }, { white, 1, 8 } }) {
 
         for (int8_t i = 0;
-             auto type :
+             auto const type :
              { rook, knight, bishop, queen, king, bishop, knight, rook }) {
 
-            int8_t index = add + i;
+            int8_t const index = add + i;
 
             pieces[index] = {
                 .type = type,
@@ -372,8 +372,6 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
         SDL_RenderClear(main_renderer);
         render_board(assets, game_data, window_data);
         if (selection) {
-            SDL_Color halo{ .r = 0, .g = 100, .b = 200, .a = 200 };
-            SDL_Color halo_takes{ .r = 200, .g = 100, .b = 0, .a = 200 };
             for (auto const move : moves) {
                 tile.x = move.where.x * tile_width;
                 tile.y = move.where.y * tile_height;
@@ -410,6 +408,8 @@ main(int const argc, char const* const* const argv)
                                           SDL_WINDOW_RESIZABLE) };
 
     check_sdl_failure(not main_window.get(), "Window creation");
+
+    SDL_SetWindowMinimumSize(main_window.get(), width / 10, height / 10);
 
     auto const render_flags = SDL_RENDERER_ACCELERATED;
 
