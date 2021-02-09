@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdio>
 #include <limits>
 #include <optional>
 #include <vector>
@@ -17,6 +18,8 @@ enum PieceType
     pawn,
     Count,
 };
+constexpr auto names =
+  std::to_array({ "rook", "knight", "bishop", "queen", "king", "pawn" });
 };
 
 namespace LetterColumn {
@@ -43,11 +46,12 @@ enum Colour
     black,
     Count,
 };
+constexpr auto names = std::to_array({ "white", "black" });
 };
 
 struct Position
 {
-    int8_t row, col;
+    int8_t x, y;
 };
 
 using MoveVector = std::vector<Position>;
@@ -75,6 +79,21 @@ struct GameData
             return {};
         else
             return { pieces[index] };
+    }
+    inline void log() const
+    {
+        for (int y = 0; y < 8; ++y) {
+            for (int x = 0; x < 8; ++x) {
+                auto const pc = peek(x, y);
+                if (pc.has_value()) {
+                    std::printf("%7s", PieceType::names[pc.value().type]);
+                } else {
+                    std::printf("%7s", "none");
+                }
+            }
+            std::puts("");
+        }
+        std::puts("");
     }
 };
 
