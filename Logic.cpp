@@ -10,12 +10,6 @@
 
 #include "Logic.h"
 
-constexpr bool
-out_of_bounds(Position p)
-{
-    return p.row >= 8 or p.col >= 8 or p.row < 0 or p.col < 0;
-}
-
 MoveContainer
 get_moves_rook(Piece const pc, GameData const& board)
 {
@@ -32,13 +26,13 @@ get_moves_rook(Piece const pc, GameData const& board)
         auto pos{ pc.pos };
 
         for (;;) {
-            pos.row += y;
-            pos.col += x;
+            pos.y += y;
+            pos.x += x;
 
             if (out_of_bounds(pos))
                 break;
 
-            auto piece = board.peek(pos.col, pos.row);
+            auto piece = board.peek(pos.x, pos.y);
 
             bool takes = false;
 
@@ -81,13 +75,13 @@ get_moves_knight(Piece const pc, GameData const& board)
     for (auto const [x, y] : ways) {
         auto pos{ pc.pos };
 
-        pos.row += y;
-        pos.col += x;
+        pos.x += x;
+        pos.y += y;
 
         if (out_of_bounds(pos))
-            break;
+            continue;
 
-        auto piece = board.peek(pos.col, pos.row);
+        auto const piece = board.peek(pos.x, pos.y);
 
         bool takes = false;
 
@@ -95,6 +89,12 @@ get_moves_knight(Piece const pc, GameData const& board)
             auto& value = piece.value();
             // encountered enemy
             if (value.colour != pc.colour) {
+                board.log();
+                std::printf("encountered %s %s at %d,%d\n",
+                            Colour::names[value.colour],
+                            PieceType::names[value.type],
+                            value.pos.x,
+                            value.pos.y);
                 moves.push_back({ .where = pos, .takes = true });
             }
             // empty tile
@@ -122,13 +122,13 @@ get_moves_bishop(Piece const pc, GameData const& board)
         auto pos{ pc.pos };
 
         for (;;) {
-            pos.row += y;
-            pos.col += x;
+            pos.y += y;
+            pos.x += x;
 
             if (out_of_bounds(pos))
                 break;
 
-            auto piece = board.peek(pos.col, pos.row);
+            auto piece = board.peek(pos.x, pos.y);
 
             bool takes = false;
 
@@ -173,13 +173,13 @@ get_moves_queen(Piece const pc, GameData const& board)
         auto pos{ pc.pos };
 
         for (;;) {
-            pos.row += y;
-            pos.col += x;
+            pos.y += y;
+            pos.x += x;
 
             if (out_of_bounds(pos))
                 break;
 
-            auto piece = board.peek(pos.col, pos.row);
+            auto piece = board.peek(pos.x, pos.y);
 
             bool takes = false;
 
@@ -222,24 +222,26 @@ get_moves_king(Piece const pc, GameData const& board)
     for (auto const [x, y] : ways) {
         auto pos{ pc.pos };
 
-        pos.row += y;
-        pos.col += x;
+        pos.x += x;
+        pos.y += y;
 
         if (out_of_bounds(pos))
-            break;
+            continue;
 
-        auto piece = board.peek(pos.col, pos.row);
+        auto const piece = board.peek(pos.x, pos.y);
+        std::printf("peeking on %d : %d\n", pos.x, pos.y);
 
         bool takes = false;
 
         if (piece.has_value()) {
-            auto& value = piece.value();
+            std::printf("there is someone\n");
+            auto const& value = piece.value();
             // encountered enemy
             if (value.colour != pc.colour) {
                 moves.push_back({ .where = pos, .takes = true });
             }
-            // empty tile
-        } else {
+        } else { // empty tile
+            std::printf("move on %d : %d\n", pos.x, pos.y);
             moves.push_back({ .where = pos, .takes = false });
         }
     }
@@ -263,11 +265,11 @@ get_moves_pawn(Piece const pc, GameData const& board)
         requirement = LetterColumn::Y(7);
     }
 
-    if (pc.pos.row == requirement) {
+    if (pc.pos.y == requirement) {
         auto where{ pc.pos };
-        where.row += 2 * dir;
+        where.y += 2 * dir;
 
-        auto piece = board.peek(where.col, where.row);
+        auto piece = board.peek(where.x, where.y);
         if (piece.has_value()) {
             if (piece.value().colour != pc.colour) {
                 moves.push_back({
@@ -285,9 +287,9 @@ get_moves_pawn(Piece const pc, GameData const& board)
 
     {
         auto where{ pc.pos };
-        where.row += dir;
+        where.y += dir;
 
-        auto piece = board.peek(where.col, where.row);
+        auto piece = board.peek(where.x, where.y);
         if (piece.has_value()) {
             if (piece.value().colour != pc.colour) {
                 moves.push_back({
@@ -308,10 +310,10 @@ get_moves_pawn(Piece const pc, GameData const& board)
 
     for (auto const [x, y] : ways) {
         auto where{ pc.pos };
-        where.row += y;
-        where.col += x;
+        where.y += y;
+        where.x += x;
 
-        auto piece = board.peek(where.col, where.row);
+        auto piece = board.peek(where.x, where.y);
         // if there is a pawn in diagonal, and that pawn is an enemy and they
         // moved 2 tiles
         if (piece.has_value() and piece.value().colour != pc.colour and
@@ -327,11 +329,11 @@ get_moves_pawn(Piece const pc, GameData const& board)
     return moves;
 }
 
-MoveContainer
+[[nodiscard]] MoveContainer
 get_moves(Piece const pc, GameData const& context)
 {
 
-    auto const functions = std::to_array({
+    constexpr auto functions = std::to_array({
       &get_moves_rook,
       &get_moves_knight,
       &get_moves_bishop,
@@ -340,7 +342,28 @@ get_moves(Piece const pc, GameData const& context)
       &get_moves_pawn,
     });
 
-    // TODO: remove change at into []
-    return functions.at(pc.type)(pc, context);
+    return functions[pc.type](pc, context);
+}
+
+inline MoveContainer
+alternative_get_moves(Piece const pc, GameData const& context)
+{
+    using namespace PieceType;
+    switch (pc.type) {
+        case rook:
+            return get_moves_rook(pc, context);
+        case knight:
+            return get_moves_knight(pc, context);
+        case bishop:
+            return get_moves_bishop(pc, context);
+        case queen:
+            return get_moves_queen(pc, context);
+        case king:
+            return get_moves_king(pc, context);
+        case pawn:
+            return get_moves_pawn(pc, context);
+        default:
+            return {}; // never reached
+    }
 }
 
