@@ -11,6 +11,7 @@
 
 #include "CustomDeleters.hpp"
 #include "Helpers.h"
+#include "Logic.h"
 #include "Pieces.hpp"
 
 void
@@ -211,17 +212,19 @@ generate_default_game_data()
 
             pieces[index] = {
                 .type = type,
-                .pos{ Y(column), i },
+                .pos{ i, Y(column) },
                 .colour = colour,
                 .special = false,
             };
 
-            board[Y(column)][i] = index;
+            board[i][Y(column)] = index;
             ++i;
         }
     }
 
-    // TODO: cleanup, tried to generalize but doesn't look good
+// TODO: cleanup, tried to generalize but doesn't look good
+#if 0
+
     for (auto [colour, column, add] :
          { std::tuple{ bool{ black }, 7, 0 }, { white, 2, 8 } }) {
 
@@ -231,14 +234,15 @@ generate_default_game_data()
 
             pieces[index] = {
                 .type = pawn,
-                .pos{ Y(column), i },
+                .pos{ i, Y(column) },
                 .colour = colour,
                 .special = false,
             };
 
-            board[Y(column)][i] = index;
+            board[i][Y(column)] = index;
         }
     }
+#endif
 
     return data;
 }
@@ -265,7 +269,7 @@ render_board(Assets const& assets,
              WindowData& window_data)
 {
     auto const [w, h] = window_data.size();
-    SDL_Log("width : %d, height : %d\n", w, h);
+    // SDL_Log("width : %d, height : %d\n", w, h);
     SDL_Rect tile{ .x = 0, .y = 0, .w = w / 8, .h = h / 8 };
 
     // TODO: handle screen resize and scale this in a rectangle
@@ -275,23 +279,122 @@ render_board(Assets const& assets,
 
     SDL_RenderCopy(renderer, assets.board, nullptr, &screen_rect);
 
+#if 1
     for (auto const& arr : game_data.board) {
         for (auto const ptr : arr) {
             if (ptr != -1) {
                 auto& [type, pos, colour, special] = game_data.pieces[ptr];
 
-                tile.x = pos.col * tile.w;
-                tile.y = pos.row * tile.h;
+                tile.x = pos.x * tile.w;
+                tile.y = pos.y * tile.h;
 
                 SDL_RenderCopy(
                   renderer, assets.pieces[colour][type], nullptr, &tile);
             }
         }
     }
+#else
+    for (int x = 0; x < 8; ++x) {
+        for (int y = 0; y < 8; ++y) {
+            auto res = game_data.peek(x, y);
+            if (res) {
+                auto& [type, pos, colour, special] = res.value();
+
+                tile.x = pos.x * tile.w;
+                tile.y = pos.y * tile.h;
+
+                SDL_RenderCopy(
+                  renderer, assets.pieces[colour][type], nullptr, &tile);
+            }
+        }
+    }
+
+#endif
+}
+
+void
+game(Assets const& assets, GameData& game_data, WindowData& window_data)
+{
+    auto* main_renderer = window_data.renderer();
+
+    int mouse_x, mouse_y;
+    uint32_t prev_mouse_state{}, mouse_state{};
+
+    MoveContainer moves{};
+
+    std::optional<Piece> selection{};
+
+    bool run{ true };
+    while (run) {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            switch (e.type) {
+                case SDL_QUIT: {
+                    run = false;
+                } break;
+            }
+        }
+        mouse_state = SDL_GetMouseState(&mouse_x, &mouse_y);
+
+        auto const [win_w, win_h] = window_data.size();
+        auto const tile_width = win_w / 8;
+        auto const tile_height = win_h / 8;
+
+        auto const x = (mouse_x / tile_width) % 8;
+        auto const y = (mouse_y / tile_height) % 8;
+
+        SDL_Rect tile{ .x{}, .y{}, .w = tile_width, .h = tile_height };
+
+        // released
+        if (not(mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) and
+            prev_mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+
+            auto const piece_selected = game_data.peek(x, y);
+
+            SDL_Log("clicked on %d : %d\n", x, y);
+
+            if (piece_selected.has_value()) {
+                game_data.log();
+                SDL_Log("Selected : %s %s\n",
+                        Colour::names[piece_selected.value().colour],
+                        PieceType::names[piece_selected.value().type]);
+
+                selection = piece_selected.value();
+                moves = get_moves(piece_selected.value(), game_data);
+                for (auto const move : moves) {
+                    SDL_Log("move on %d : %d\n", move.where.x, move.where.y);
+                }
+            } else {
+                selection.reset();
+            }
+        }
+
+        SDL_RenderClear(main_renderer);
+        render_board(assets, game_data, window_data);
+        if (selection) {
+            SDL_Color halo{ .r = 0, .g = 100, .b = 200, .a = 200 };
+            SDL_Color halo_takes{ .r = 200, .g = 100, .b = 0, .a = 200 };
+            for (auto const move : moves) {
+                tile.x = move.where.x * tile_width;
+                tile.y = move.where.y * tile_height;
+                if (not move.takes) {
+                    SDL_SetRenderDrawColor(main_renderer, 0, 100, 200, 200);
+                } else {
+                    SDL_SetRenderDrawColor(main_renderer, 0, 200, 100, 200);
+                }
+                SDL_RenderFillRect(main_renderer, &tile);
+            }
+        }
+
+        SDL_RenderPresent(main_renderer);
+        SDL_WaitEvent(nullptr);
+
+        prev_mouse_state = mouse_state;
+    }
 }
 
 int
-main(int argc, char* argv[])
+main(int const argc, char const* const* const argv)
 {
     int const width = 800;
     int const height = 800;
@@ -326,21 +429,6 @@ main(int argc, char* argv[])
 
     auto game_data = generate_default_game_data();
 
-    bool run{ true };
-    while (run) {
-        SDL_Event e;
-        while (SDL_PollEvent(&e)) {
-            switch (e.type) {
-                case SDL_QUIT: {
-                    run = false;
-                } break;
-            }
-        }
-
-        SDL_RenderClear(main_renderer.get());
-        render_board(assets, game_data, main_window);
-        SDL_RenderPresent(main_renderer.get());
-        SDL_WaitEvent(nullptr);
-    }
+    game(assets, game_data, main_window);
 }
 

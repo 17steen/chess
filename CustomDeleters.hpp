@@ -27,6 +27,8 @@ using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
 using TexturePtr = std::unique_ptr<SDL_Texture, TextureDeleter>;
 using RendererPtr = std::unique_ptr<SDL_Renderer, RendererDeleter>;
 
+static_assert(sizeof(RendererPtr) == sizeof(SDL_Renderer*));
+
 inline WindowPtr
 to_ptr(SDL_Window* w)
 {
