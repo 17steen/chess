@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "CustomDeleters.hpp"
+#include "Helpers.h"
 #include "Pieces.hpp"
 
 void
@@ -63,6 +64,7 @@ generate_board()
         ashift = 24;
     }
 
+    // TODO: probably allow reading that from a config file / settings menu
     constexpr SDL_Color const white_tile_colour{ 230, 204, 171, 0xFF };
     constexpr SDL_Color const black_tile_colour{ 157, 87, 27, 0xFF };
 
@@ -93,11 +95,7 @@ generate_board()
             current_colour = not current_colour;
         }
     }
-
-    return {
-        board,
-        &SDL_FreeSurface,
-    };
+    return to_ptr(board);
 }
 
 struct Assets
@@ -162,10 +160,11 @@ load_assets(RendererPtr const& renderer)
 
     // loading cursor
     {
-        auto surface = to_ptr(IMG_Load((assets_dir / "cursor.png").c_str()));
+        auto const surface =
+          to_ptr(IMG_Load((assets_dir / "cursor.png").c_str()));
         check_img_failure(not surface.get(), "Cursor loading");
 
-        auto texture =
+        auto const texture =
           SDL_CreateTextureFromSurface(renderer.get(), surface.get());
         check_sdl_failure(not texture, "Texture from cursor surface");
 
@@ -174,7 +173,7 @@ load_assets(RendererPtr const& renderer)
 
     // generating board
     {
-        auto texture =
+        auto const texture =
           SDL_CreateTextureFromSurface(renderer.get(), generate_board().get());
 
         check_sdl_failure(not texture, "Texture from board surface");
@@ -244,29 +243,48 @@ generate_default_game_data()
     return data;
 }
 
+struct WindowData
+{
+    SDL_Window* win;
+    inline std::pair<int, int> size()
+    {
+        int w, h;
+        SDL_GetWindowSize(win, &w, &h);
+        return { w, h };
+    }
+    inline auto get() { return win; }
+    inline auto renderer() { return SDL_GetRenderer(win); }
+
+    ~WindowData() { SDL_DestroyWindow(win); }
+};
+
 // TODO: pass in a struct has all necessary information on the window
 void
 render_board(Assets const& assets,
              GameData const& game_data,
-             RendererPtr& renderer)
+             WindowData& window_data)
 {
-    SDL_Rect tile{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    auto const [w, h] = window_data.size();
+    SDL_Log("width : %d, height : %d\n", w, h);
+    SDL_Rect tile{ .x = 0, .y = 0, .w = w / 8, .h = h / 8 };
 
     // TODO: handle screen resize and scale this in a rectangle
-    SDL_Rect screen_rect{ .x = 0, .y = 0, .w = 800, .h = 800 };
+    SDL_Rect screen_rect{ .x = 0, .y = 0, .w = w, .h = h };
 
-    SDL_RenderCopy(renderer.get(), assets.board, nullptr, &screen_rect);
+    auto* renderer = window_data.renderer();
+
+    SDL_RenderCopy(renderer, assets.board, nullptr, &screen_rect);
 
     for (auto const& arr : game_data.board) {
         for (auto const ptr : arr) {
             if (ptr != -1) {
                 auto& [type, pos, colour, special] = game_data.pieces[ptr];
 
-                tile.x = pos.col * 100;
-                tile.y = pos.row * 100;
+                tile.x = pos.col * tile.w;
+                tile.y = pos.row * tile.h;
 
                 SDL_RenderCopy(
-                  renderer.get(), assets.pieces[colour][type], nullptr, &tile);
+                  renderer, assets.pieces[colour][type], nullptr, &tile);
             }
         }
     }
@@ -280,19 +298,24 @@ main(int argc, char* argv[])
 
     initialize_sdl();
 
-    auto main_window = to_ptr(SDL_CreateWindow("Chess game",
-                                               SDL_WINDOWPOS_CENTERED,
-                                               SDL_WINDOWPOS_CENTERED,
-                                               width,
-                                               height,
-                                               SDL_WINDOW_RESIZABLE));
+    auto main_window =
+      WindowData{ .win = SDL_CreateWindow("Chess game",
+                                          SDL_WINDOWPOS_CENTERED,
+                                          SDL_WINDOWPOS_CENTERED,
+                                          width,
+                                          height,
+                                          SDL_WINDOW_RESIZABLE) };
 
     check_sdl_failure(not main_window.get(), "Window creation");
 
     auto const render_flags = SDL_RENDERER_ACCELERATED;
 
+    // TODO: figure out if i need to store the renderer since it is associated
+    // to the window
     auto main_renderer =
       to_ptr(SDL_CreateRenderer(main_window.get(), -1, render_flags));
+
+    assert(main_renderer.get() == SDL_GetRenderer(main_window.get()));
 
     // data structure containing all textures representing games pieces
     auto const assets = load_assets(main_renderer);
@@ -300,9 +323,6 @@ main(int argc, char* argv[])
     check_sdl_failure(not main_renderer.get(), "Renderer creation");
 
     SDL_SetRenderDrawBlendMode(main_renderer.get(), SDL_BLENDMODE_BLEND);
-
-    // TODO: handle screen resize and scale this in a rectangle
-    SDL_Rect screen_rect{ .x = 0, .y = 0, .w = width, .h = height };
 
     auto game_data = generate_default_game_data();
 
@@ -318,7 +338,7 @@ main(int argc, char* argv[])
         }
 
         SDL_RenderClear(main_renderer.get());
-        render_board(assets, game_data, main_renderer);
+        render_board(assets, game_data, main_window);
         SDL_RenderPresent(main_renderer.get());
         SDL_WaitEvent(nullptr);
     }
