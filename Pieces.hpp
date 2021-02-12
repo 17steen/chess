@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <limits>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace PieceType {
@@ -53,6 +54,10 @@ constexpr auto names = std::to_array({ "white", "black" });
 struct Position
 {
     int8_t x, y;
+    constexpr bool operator==(Position other)
+    {
+        return other.x == x and other.y == y;
+    };
 };
 
 using MoveVector = std::vector<Position>;
@@ -64,6 +69,7 @@ struct Piece
     bool colour;
     bool special; // to be marked as true when the pawn moves two tiles and to
                   // false at its next move
+    bool alive = true;
 };
 
 struct GameData
@@ -73,6 +79,7 @@ struct GameData
     std::array<Piece, 32> pieces;
     std::array<std::array<int8_t, 8>, 8> board;
 
+    // TODO: this sucks, neither a reference, neither do i have the index
     [[nodiscard]] std::optional<Piece> peek(int8_t const x,
                                             int8_t const y) const noexcept
     {

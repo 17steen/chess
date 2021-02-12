@@ -345,25 +345,3 @@ get_moves(Piece const pc, GameData const& context)
     return functions[pc.type](pc, context);
 }
 
-inline MoveContainer
-alternative_get_moves(Piece const pc, GameData const& context)
-{
-    using namespace PieceType;
-    switch (pc.type) {
-        case rook:
-            return get_moves_rook(pc, context);
-        case knight:
-            return get_moves_knight(pc, context);
-        case bishop:
-            return get_moves_bishop(pc, context);
-        case queen:
-            return get_moves_queen(pc, context);
-        case king:
-            return get_moves_king(pc, context);
-        case pawn:
-            return get_moves_pawn(pc, context);
-        default:
-            return {}; // never reached
-    }
-}
-
