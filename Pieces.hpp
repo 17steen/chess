@@ -79,6 +79,28 @@ struct GameData
     std::array<Piece, 32> pieces;
     std::array<std::array<int8_t, 8>, 8> board;
 
+    struct PeekResult
+    {
+        int8_t idx;
+        Piece* piece;
+        // trying to use the same naming as std::optional
+        [[nodiscard]] constexpr bool has_value() const { return idx != -1; }
+        [[nodiscard]] explicit constexpr operator bool() { return has_value(); }
+        [[nodiscard]] constexpr Piece const& value() const { return *piece; }
+        [[nodiscard]] constexpr Piece& value() { return *piece; }
+        constexpr void reset() { idx = -1; }
+    };
+
+    // should only be used to move to an emtpy position
+    void move(PeekResult pk, Position to)
+    {
+        board[to.x][to.y] =
+          pk.idx; // new position is overwritten, it was hopefully empty
+        auto const [x, y] = pk.value().pos;
+        board[x][y] = -1;    // previous position is emptied
+        pk.value().pos = to; // make piece aware of the move
+    }
+
     // TODO: this sucks, neither a reference, neither do i have the index
     [[nodiscard]] std::optional<Piece> peek(int8_t const x,
                                             int8_t const y) const noexcept
@@ -88,6 +110,22 @@ struct GameData
             return {};
         else
             return { pieces[index] };
+    }
+
+    [[nodiscard]] constexpr PeekResult get(int8_t const x,
+                                           int8_t const y) noexcept
+    {
+        auto const index = board[x][y];
+        if (index == -1)
+            // access should be prevented by using "has_value()"
+            return { index, nullptr };
+        else
+            return { index, &pieces[index] };
+    }
+
+    [[nodiscard]] constexpr PeekResult get(Position p) noexcept
+    {
+        return get(p.x, p.y);
     }
 
     inline void log() const

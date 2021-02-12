@@ -324,7 +324,7 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
 
     MoveContainer moves{};
 
-    std::optional<Piece> selection{};
+    GameData::PeekResult selection{};
 
     bool run{ true };
     while (run) {
@@ -342,8 +342,8 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
         auto const tile_width = win_w / 8;
         auto const tile_height = win_h / 8;
 
-        int8_t const x = (mouse_x / tile_width) % 8;
-        int8_t const y = (mouse_y / tile_height) % 8;
+        int8_t const m_x = (mouse_x / tile_width) % 8;
+        int8_t const m_y = (mouse_y / tile_height) % 8;
 
         SDL_Rect tile{ .x{}, .y{}, .w = tile_width, .h = tile_height };
 
@@ -355,8 +355,8 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
             // if there is a selection
             if (selection.has_value()) {
                 auto const res = std::find_if(
-                  std::begin(moves), std::end(moves), [x, y](Move mv) {
-                      return mv.where.operator==({ x, y });
+                  std::begin(moves), std::end(moves), [m_x, m_y](Move mv) {
+                      return mv.where.operator==({ m_x, m_y });
                   });
 
                 // didn't click on a move
@@ -369,45 +369,25 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
                             res->takes ? "takes" : "doesn't take");
                     auto const& [where, takes] = *res;
 
-                    // kill piece
+                    // take piece
                     if (takes) {
-                        auto const [x, y] = selection.value().pos;
-                        auto& selection_idx = game_data.board[x][y];
+                        // get piece at that position, then mark it as dead
+                        game_data.get(where).value().alive = false;
+                        game_data.move(selection, where);
 
-                        auto& target_piece = game_data.pieces[selection_idx];
-
-                        target_piece.alive = false;
-
-                        game_data.board[where.x][where.y] = selection_idx;
-
-                        selection_idx = -1;
-                        target_piece.pos = where;
-                        game_data.log();
-
-                        selection.reset();
                     } else {
-                        // TODO: fix this utter garbage
-                        //  this is querying the index of the piece selected,
-                        //  stupid, it should already be stored
-                        //  i should NOT have to ask something that i already
-                        //  knew before
-                        auto const [x, y] = selection.value().pos;
-                        auto& selection_idx = game_data.board[x][y];
-                        game_data.board[where.x][where.y] = selection_idx;
-                        auto& target_piece = game_data.pieces[selection_idx];
-                        selection_idx = -1;
-                        target_piece.pos = where;
-                        game_data.log();
-
-                        selection.reset();
+                        game_data.move(selection, where);
                     }
+                    game_data.log();
+
+                    selection.reset();
                 }
 
             } else {
 
-                auto const piece_selected = game_data.peek(x, y);
+                auto piece_selected = game_data.get(m_x, m_y);
 
-                SDL_Log("clicked on %d : %d\n", x, y);
+                SDL_Log("clicked on %d : %d\n", m_x, m_y);
 
                 if (piece_selected.has_value()) {
                     game_data.log();
@@ -415,7 +395,7 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
                             Colour::names[piece_selected.value().colour],
                             PieceType::names[piece_selected.value().type]);
 
-                    selection = piece_selected.value();
+                    selection = piece_selected;
                     moves = get_moves(piece_selected.value(), game_data);
                     for (auto const move : moves) {
                         SDL_Log(
