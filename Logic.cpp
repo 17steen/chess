@@ -38,7 +38,7 @@ get_moves_rook(Piece const pc, GameData const& board)
 
             if (piece.has_value()) {
                 auto& value = piece.value();
-                // encountered team mate
+                // encountered teammate
                 if (value.colour == pc.colour) {
                     break;
                     // encountered enemy
@@ -134,7 +134,7 @@ get_moves_bishop(Piece const pc, GameData const& board)
 
             if (piece.has_value()) {
                 auto& value = piece.value();
-                // encountered team mate
+                // encountered teammate
                 if (value.colour == pc.colour) {
                     break;
                     // encountered enemy
@@ -185,7 +185,7 @@ get_moves_queen(Piece const pc, GameData const& board)
 
             if (piece.has_value()) {
                 auto& value = piece.value();
-                // encountered team mate
+                // encountered teammate
                 if (value.colour == pc.colour) {
                     break;
                     // encountered enemy
