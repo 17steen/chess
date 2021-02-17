@@ -15,3 +15,4 @@ set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-point
 
 add_executable(chess main.cpp Logic.cpp)
 target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES} SDL2_image)
+target_include_directories(${PROJECT_NAME} ${SDL2_DIR})
