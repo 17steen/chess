@@ -101,8 +101,7 @@ generate_board()
 
 struct Assets
 {
-    std::array<std::array<SDL_Texture*, PieceType::Count>, Colour::Count>
-      pieces;
+    std::array<std::array<SDL_Texture*, PieceType::Count>, 2> pieces;
 
     SDL_Texture* cursor{};
     SDL_Texture* board{};
@@ -191,7 +190,7 @@ GameData
 generate_default_game_data()
 {
     GameData data{};
-    auto& [pieces, board] = data;
+    auto& [pieces, board, turn] = data;
 
     using namespace PieceType;
     using namespace Colour;
@@ -202,7 +201,7 @@ generate_default_game_data()
             val = -1;
 
     for (auto const [colour, column, add] :
-         { std::tuple{ bool{ black }, 8, 0 }, { white, 1, 8 } }) {
+         { std::tuple{ black, 8, 0 }, { white, 1, 8 } }) {
 
         for (int8_t i = 0;
              auto const type :
@@ -222,9 +221,9 @@ generate_default_game_data()
         }
     }
 
-// TODO: cleanup, tried to generalize but doesn't look good
-#if 0
+#if 1
 
+    // TODO: cleanup, tried to generalize but doesn't look good
     for (auto [colour, column, add] :
          { std::tuple{ bool{ black }, 7, 0 }, { white, 2, 8 } }) {
 
@@ -298,7 +297,7 @@ render_board(Assets const& assets,
 #else
     for (int x = 0; x < 8; ++x) {
         for (int y = 0; y < 8; ++y) {
-            auto res = game_data.peek(x, y);
+            auto res = game_data.get(x, y);
             if (res) {
                 auto& [type, pos, colour, special] = res.value();
 
@@ -348,12 +347,12 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
         SDL_Rect tile{ .x{}, .y{}, .w = tile_width, .h = tile_height };
 
         // released
-
         if (not(mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) and
             prev_mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 
-            // if there is a selection
+            // if there is a selection and we are the right player
             if (selection.has_value()) {
+
                 auto const res = std::find_if(
                   std::begin(moves), std::end(moves), [m_x, m_y](Move mv) {
                       return mv.where.operator==({ m_x, m_y });
@@ -364,10 +363,20 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
                     // TODO: make this check one clicked on another valid piece
                     // goto if it needs to
                     selection.reset();
+
+                    // player clicked on a move
                 } else { // TODO: handle clicked on a valid move
                     SDL_Log("valid move ! %s\n",
                             res->takes ? "takes" : "doesn't take");
                     auto const& [where, takes] = *res;
+
+                    // TODO: make this readable
+                    // means that the pawn just moved two tiles
+                    if (selection.value().type == PieceType::pawn and
+                        std::abs(where.y - selection.value().pos.y) == 2) {
+                        selection.value().special = true;
+                        SDL_Log("pawn moved two tiles\n");
+                    }
 
                     // take piece
                     if (takes) {
@@ -378,29 +387,26 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
                     } else {
                         game_data.move(selection, where);
                     }
-                    game_data.log();
 
+                    game_data.switch_turn();
                     selection.reset();
                 }
 
+                // nothing valid was selected
             } else {
 
                 auto piece_selected = game_data.get(m_x, m_y);
 
                 SDL_Log("clicked on %d : %d\n", m_x, m_y);
 
-                if (piece_selected.has_value()) {
-                    game_data.log();
+                if (piece_selected.has_value() and
+                    piece_selected.value().colour == game_data.player()) {
                     SDL_Log("Selected : %s %s\n",
                             Colour::names[piece_selected.value().colour],
                             PieceType::names[piece_selected.value().type]);
 
                     selection = piece_selected;
                     moves = get_moves(piece_selected.value(), game_data);
-                    for (auto const move : moves) {
-                        SDL_Log(
-                          "move on %d : %d\n", move.where.x, move.where.y);
-                    }
                 } else {
                     selection.reset();
                 }
@@ -453,7 +459,7 @@ main(int const argc, char const* const* const argv)
 
     // TODO: figure out if i need to store the renderer since it is associated
     // to the window
-    auto main_renderer =
+    auto const main_renderer =
       to_ptr(SDL_CreateRenderer(main_window.get(), -1, render_flags));
 
     assert(main_renderer.get() == SDL_GetRenderer(main_window.get()));

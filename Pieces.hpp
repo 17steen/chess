@@ -42,11 +42,10 @@ enum LetterColumn
 };
 
 namespace Colour {
-enum Colour
+enum Colour : bool
 {
     white,
     black,
-    Count,
 };
 constexpr auto names = std::to_array({ "white", "black" });
 };
@@ -78,6 +77,7 @@ struct GameData
     // should be done through the pointers(array index).
     std::array<Piece, 32> pieces;
     std::array<std::array<int8_t, 8>, 8> board;
+    Colour::Colour turn = Colour::white;
 
     struct PeekResult
     {
@@ -101,7 +101,8 @@ struct GameData
         pk.value().pos = to; // make piece aware of the move
     }
 
-    // TODO: this sucks, neither a reference, neither do i have the index
+    // use alternative, will be used as a const way to get access to
+    // pieces
     [[nodiscard]] std::optional<Piece> peek(int8_t const x,
                                             int8_t const y) const noexcept
     {
@@ -143,5 +144,10 @@ struct GameData
         }
         std::puts("");
     }
+
+    // switches players and returns the current player
+    constexpr bool switch_turn() { return turn = Colour::Colour{ !turn }; }
+    constexpr bool opponent() const { return !turn; }
+    constexpr bool player() const { return turn; }
 };
 

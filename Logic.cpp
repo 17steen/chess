@@ -1,3 +1,4 @@
+#include "SDL.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -89,7 +90,6 @@ get_moves_knight(Piece const pc, GameData const& board)
             auto& value = piece.value();
             // encountered enemy
             if (value.colour != pc.colour) {
-                board.log();
                 std::printf("encountered %s %s at %d,%d\n",
                             Colour::names[value.colour],
                             PieceType::names[value.type],
@@ -265,19 +265,14 @@ get_moves_pawn(Piece const pc, GameData const& board)
         requirement = LetterColumn::Y(7);
     }
 
+    // check if you can move 2 steps up
+    // TODO: this allows to jump over pawmns, not good
     if (pc.pos.y == requirement) {
         auto where{ pc.pos };
         where.y += 2 * dir;
 
         auto piece = board.peek(where.x, where.y);
-        if (piece.has_value()) {
-            if (piece.value().colour != pc.colour) {
-                moves.push_back({
-                  .where = where,
-                  .takes = true,
-                });
-            }
-        } else {
+        if (not piece.has_value()) {
             moves.push_back({
               .where = where,
               .takes = false,
@@ -305,25 +300,24 @@ get_moves_pawn(Piece const pc, GameData const& board)
         }
     }
 
-    // checking en passant
     auto const ways = std::to_array({ std::pair{ 1, dir }, { -1, dir } });
 
+    // for diagonal takes
     for (auto const [x, y] : ways) {
         auto where{ pc.pos };
         where.y += y;
         where.x += x;
 
-        auto piece = board.peek(where.x, where.y);
+        SDL_Log("checking en passant at %d : %d\n", where.x, where.y);
+
+        auto const piece = board.peek(where.x, where.y);
         // if there is a pawn in diagonal, and that pawn is an enemy and they
         // moved 2 tiles
-        if (piece.has_value() and piece.value().colour != pc.colour and
-            piece.value().special) {
-
+        if (piece.has_value() and piece.value().colour != pc.colour)
             moves.push_back({
               .where = where,
               .takes = true,
             });
-        }
     }
 
     return moves;
