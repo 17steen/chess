@@ -71,7 +71,7 @@ struct Piece
     bool alive = true;
 };
 
-struct GameData
+struct BoardInfo
 {
     // this array should only be generated once, all other accesses to the data
     // should be done through the pointers(array index).
@@ -149,5 +149,14 @@ struct GameData
     constexpr bool switch_turn() { return turn = Colour::Colour{ !turn }; }
     constexpr bool opponent() const { return !turn; }
     constexpr bool player() const { return turn; }
+};
+
+struct GameData
+{
+    using HistoryContainer = std::vector<BoardInfo>;
+    BoardInfo current_board;
+    HistoryContainer history{};
+
+    void save() { history.push_back(current_board); }
 };
 

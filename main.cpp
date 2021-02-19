@@ -1,6 +1,7 @@
 #include "SDL.h"
 #include "SDL_image.h"
 
+#include <SDL_scancode.h>
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
@@ -186,10 +187,10 @@ load_assets(RendererPtr const& renderer)
     return assets;
 }
 
-GameData
+BoardInfo
 generate_default_game_data()
 {
-    GameData data{};
+    BoardInfo data{};
     auto& [pieces, board, turn] = data;
 
     using namespace PieceType;
@@ -264,7 +265,7 @@ struct WindowData
 // TODO: pass in a struct has all necessary information on the window
 void
 render_board(Assets const& assets,
-             GameData const& game_data,
+             BoardInfo const& board_info,
              WindowData& window_data)
 {
     auto const [w, h] = window_data.size();
@@ -278,12 +279,12 @@ render_board(Assets const& assets,
 
     SDL_RenderCopy(renderer, assets.board, nullptr, &screen_rect);
 
-#if 1
-    for (auto const& arr : game_data.board) {
+#if 0
+    for (auto const& arr : board_info.board) {
         for (auto const ptr : arr) {
             if (ptr != -1) {
                 auto& [type, pos, colour, special, alive] =
-                  game_data.pieces[ptr];
+                  board_info.pieces[ptr];
 
                 tile.x = pos.x * tile.w;
                 tile.y = pos.y * tile.h;
@@ -295,18 +296,13 @@ render_board(Assets const& assets,
     }
 
 #else
-    for (int x = 0; x < 8; ++x) {
-        for (int y = 0; y < 8; ++y) {
-            auto res = game_data.get(x, y);
-            if (res) {
-                auto& [type, pos, colour, special] = res.value();
+    for (auto const pc : board_info.pieces) {
+        if (pc.alive) {
+            tile.x = pc.pos.x * tile.w;
+            tile.y = pc.pos.y * tile.h;
 
-                tile.x = pos.x * tile.w;
-                tile.y = pos.y * tile.h;
-
-                SDL_RenderCopy(
-                  renderer, assets.pieces[colour][type], nullptr, &tile);
-            }
+            SDL_RenderCopy(
+              renderer, assets.pieces[pc.colour][pc.type], nullptr, &tile);
         }
     }
 
@@ -318,20 +314,42 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
 {
     auto* main_renderer = window_data.renderer();
 
+    auto& board = game_data.current_board;
+
     int mouse_x, mouse_y;
     uint32_t prev_mouse_state{}, mouse_state{};
 
     MoveContainer moves{};
 
-    GameData::PeekResult selection{};
+    BoardInfo::PeekResult selection{};
 
     bool run{ true };
+
     while (run) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
                 case SDL_QUIT: {
                     run = false;
+                } break;
+
+                    // if i press F1 i should see all the previous
+                    // states
+                case SDL_KEYDOWN: {
+                    switch (e.key.keysym.scancode) {
+                        // debug
+                        case SDL_SCANCODE_F1: {
+                            for (auto const& prev : game_data.history) {
+                                render_board(assets, prev, window_data);
+                                SDL_RenderPresent(main_renderer);
+                                SDL_Delay(500);
+                            }
+                        } break;
+
+                        default: {
+                        } break;
+                    }
+
                 } break;
             }
         }
@@ -378,29 +396,32 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
                         SDL_Log("pawn moved two tiles\n");
                     }
 
-                    // take piece
+                    game_data.save();
+
+                    // MUTATES GAME DATA
+                    //  take piece
                     if (takes) {
                         // get piece at that position, then mark it as dead
-                        game_data.get(where).value().alive = false;
-                        game_data.move(selection, where);
+                        board.get(where).value().alive = false;
+                        board.move(selection, where);
 
                     } else {
-                        game_data.move(selection, where);
+                        board.move(selection, where);
                     }
 
-                    game_data.switch_turn();
+                    board.switch_turn();
                     selection.reset();
                 }
 
                 // nothing valid was selected
             } else {
 
-                auto piece_selected = game_data.get(m_x, m_y);
+                auto piece_selected = board.get(m_x, m_y);
 
                 SDL_Log("clicked on %d : %d\n", m_x, m_y);
 
                 if (piece_selected.has_value() and
-                    piece_selected.value().colour == game_data.player()) {
+                    piece_selected.value().colour == board.player()) {
                     SDL_Log("Selected : %s %s\n",
                             Colour::names[piece_selected.value().colour],
                             PieceType::names[piece_selected.value().type]);
@@ -414,7 +435,7 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
         }
 
         SDL_RenderClear(main_renderer);
-        render_board(assets, game_data, window_data);
+        render_board(assets, board, window_data);
         if (selection) {
             for (auto const move : moves) {
                 tile.x = move.where.x * tile_width;
@@ -471,7 +492,8 @@ main(int const argc, char const* const* const argv)
 
     SDL_SetRenderDrawBlendMode(main_renderer.get(), SDL_BLENDMODE_BLEND);
 
-    auto game_data = generate_default_game_data();
+    GameData game_data = { .current_board{ generate_default_game_data() },
+                           .history{} };
 
     game(assets, game_data, main_window);
 }

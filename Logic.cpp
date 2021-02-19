@@ -12,8 +12,10 @@
 #include "Logic.h"
 
 MoveContainer
-get_moves_rook(Piece const pc, GameData const& board)
+get_moves_rook(Piece const pc, GameData const& game_data)
 {
+    auto const& board = game_data.current_board;
+
     MoveContainer moves{};
 
     auto ways = std::to_array({
@@ -58,9 +60,11 @@ get_moves_rook(Piece const pc, GameData const& board)
 }
 
 MoveContainer
-get_moves_knight(Piece const pc, GameData const& board)
+get_moves_knight(Piece const pc, GameData const& game_data)
 {
     MoveContainer moves{};
+
+    auto const& board = game_data.current_board;
 
     auto ways = std::to_array({
       std::pair{ 1, 2 },
@@ -107,8 +111,9 @@ get_moves_knight(Piece const pc, GameData const& board)
 }
 
 MoveContainer
-get_moves_bishop(Piece const pc, GameData const& board)
+get_moves_bishop(Piece const pc, GameData const& game_data)
 {
+    auto const& board = game_data.current_board;
     MoveContainer moves{};
 
     auto ways = std::to_array({
@@ -153,8 +158,9 @@ get_moves_bishop(Piece const pc, GameData const& board)
 }
 
 MoveContainer
-get_moves_queen(Piece const pc, GameData const& board)
+get_moves_queen(Piece const pc, GameData const& game_data)
 {
+    auto const& board = game_data.current_board;
     MoveContainer moves{};
 
     // essentially just bishop + rook
@@ -204,8 +210,9 @@ get_moves_queen(Piece const pc, GameData const& board)
 }
 
 MoveContainer
-get_moves_king(Piece const pc, GameData const& board)
+get_moves_king(Piece const pc, GameData const& game_data)
 {
+    auto const& board = game_data.current_board;
     MoveContainer moves{};
 
     auto ways = std::to_array({
@@ -250,8 +257,9 @@ get_moves_king(Piece const pc, GameData const& board)
 }
 
 MoveContainer
-get_moves_pawn(Piece const pc, GameData const& board)
+get_moves_pawn(Piece const pc, GameData const& game_data)
 {
+    auto const& board = game_data.current_board;
     MoveContainer moves{};
 
     int8_t dir;
@@ -280,19 +288,13 @@ get_moves_pawn(Piece const pc, GameData const& board)
         }
     }
 
+    // check one in front
     {
         auto where{ pc.pos };
         where.y += dir;
 
         auto piece = board.peek(where.x, where.y);
-        if (piece.has_value()) {
-            if (piece.value().colour != pc.colour) {
-                moves.push_back({
-                  .where = where,
-                  .takes = true,
-                });
-            }
-        } else {
+        if (not piece.has_value()) {
             moves.push_back({
               .where = where,
               .takes = false,
@@ -311,14 +313,14 @@ get_moves_pawn(Piece const pc, GameData const& board)
         SDL_Log("checking en passant at %d : %d\n", where.x, where.y);
 
         auto const piece = board.peek(where.x, where.y);
-        // if there is a pawn in diagonal, and that pawn is an enemy and they
-        // moved 2 tiles
         if (piece.has_value() and piece.value().colour != pc.colour)
             moves.push_back({
               .where = where,
               .takes = true,
             });
     }
+    // TODO: if pawn next to you check if last time they moved they advanced 2
+    // tiles
 
     return moves;
 }
