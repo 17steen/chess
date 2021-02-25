@@ -1,6 +1,40 @@
 #include "SDL.h"
+#include "SDL_image.h"
 #include "SDL_render.h"
 #include <memory>
+
+inline void
+check_sdl_failure(bool b, char const* what)
+{
+    if (b) {
+        SDL_Log("Error : %s, %s\n", what, SDL_GetError());
+        std::exit(1);
+    }
+}
+
+inline void
+check_img_failure(bool b, char const* what)
+{
+    if (b) {
+        SDL_Log("Error : %s, %s\n", what, IMG_GetError());
+        std::exit(1);
+    }
+}
+
+struct SDL2
+{
+    [[nodiscard]] inline SDL2(unsigned flags)
+    {
+        auto const ec = SDL_Init(flags);
+        check_sdl_failure(ec != 0, "SDL2 initialization");
+    }
+
+    [[nodiscard]] inline SDL2()
+      : SDL2(SDL_INIT_EVERYTHING)
+    {}
+
+    inline ~SDL2() { SDL_Quit(); }
+};
 
 struct WindowDeleter
 {

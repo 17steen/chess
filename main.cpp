@@ -16,31 +16,6 @@
 #include "Logic.h"
 #include "Pieces.hpp"
 
-void
-check_sdl_failure(bool b, char const* what)
-{
-    if (b) {
-        SDL_Log("Error : %s, %s\n", what, SDL_GetError());
-        std::exit(1);
-    }
-}
-
-void
-check_img_failure(bool b, char const* what)
-{
-    if (b) {
-        SDL_Log("Error : %s, %s\n", what, IMG_GetError());
-        std::exit(1);
-    }
-}
-
-void
-initialize_sdl()
-{
-    auto const ec = SDL_Init(SDL_INIT_VIDEO);
-    check_sdl_failure(ec != 0, "Video initialization");
-}
-
 SurfacePtr
 generate_board()
 {
@@ -224,6 +199,7 @@ generate_default_game_data()
         }
     }
 
+    // if i don’t want pawns to test things up i can remove this
 #if 1
 
     // TODO: cleanup, tried to generalize but doesn't look good
@@ -421,6 +397,8 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
                                 auto& target_piece = board.get(where).value();
                                 target_piece.alive = false;
 
+                                board.take(where);
+
                                 if (target_piece.type == PieceType::king) {
                                     SDL_Log(
                                       "%s won.\n",
@@ -440,6 +418,8 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
                                   board.get(where.x, y).value();
 
                                 target_piece.alive = false;
+
+                                board.take({ where.x, y });
 
                                 board.move(selection, where);
 
@@ -501,7 +481,7 @@ main(int const argc, char const* const* const argv)
     int const width = 800;
     int const height = 800;
 
-    initialize_sdl();
+    SDL2 sdl2_runtime{ SDL_INIT_VIDEO };
 
     auto main_window =
       WindowData{ .win = SDL_CreateWindow("Chess game",
@@ -517,8 +497,8 @@ main(int const argc, char const* const* const argv)
 
     auto const render_flags = SDL_RENDERER_ACCELERATED;
 
-    // TODO: figure out if i need to store the renderer since it is associated
-    // to the window
+    // TODO: figure out if i need to store the renderer since it is
+    // associated to the window
     auto const main_renderer =
       to_ptr(SDL_CreateRenderer(main_window.get(), -1, render_flags));
 
