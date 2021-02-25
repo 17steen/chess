@@ -1,4 +1,5 @@
 build
+release
 configure.sh
 .cache
 main.c
