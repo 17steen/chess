@@ -431,16 +431,20 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
 
                             } break;
                             case en_passant: {
+                                // the move is either one over or one under the
+                                // piece we are taking
                                 int8_t y =
                                   where.y + (selection.value().colour ? -1 : 1);
 
                                 auto& target_piece =
                                   board.get(where.x, y).value();
+
                                 target_piece.alive = false;
 
                                 board.move(selection, where);
 
                             } break;
+                                // TODO: castle
                             case castle: {
                             } break;
                         }
