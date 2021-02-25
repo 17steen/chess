@@ -340,7 +340,7 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
                     run = false;
                 } break;
 
-                    // if i press F1 i should see all the previous
+                    // if i press H i should see all the previous
                     // states
                 case SDL_KEYUP: {
                     switch (e.key.keysym.scancode) {
@@ -380,6 +380,7 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
         if (not(mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) and
             prev_mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 
+            // if clicking out of a move allows to recheck
             bool keep_checking;
             do {
                 keep_checking = false;
@@ -430,7 +431,15 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
 
                             } break;
                             case en_passant: {
-                                SDL_Log("En passant unimplemented!");
+                                int8_t y =
+                                  where.y + (selection.value().colour ? -1 : 1);
+
+                                auto& target_piece =
+                                  board.get(where.x, y).value();
+                                target_piece.alive = false;
+
+                                board.move(selection, where);
+
                             } break;
                             case castle: {
                             } break;
@@ -523,4 +532,3 @@ main(int const argc, char const* const* const argv)
 
     game(assets, game_data, main_window);
 }
-
