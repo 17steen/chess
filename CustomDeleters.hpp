@@ -4,22 +4,38 @@
 
 struct WindowDeleter
 {
-    void operator()(SDL_Window* w) const noexcept { SDL_DestroyWindow(w); }
+    void operator()(SDL_Window* w) const noexcept
+    {
+        SDL_Log("Destroying Window.");
+        SDL_DestroyWindow(w);
+    }
 };
 
 struct SurfaceDeleter
 {
-    void operator()(SDL_Surface* s) const noexcept { SDL_FreeSurface(s); }
+    void operator()(SDL_Surface* s) const noexcept
+    {
+        SDL_Log("Destroying Surface");
+        SDL_FreeSurface(s);
+    }
 };
 
 struct TextureDeleter
 {
-    void operator()(SDL_Texture* t) const noexcept { SDL_DestroyTexture(t); }
+    void operator()(SDL_Texture* t) const noexcept
+    {
+        SDL_Log("Destroying Texture");
+        SDL_DestroyTexture(t);
+    }
 };
 
 struct RendererDeleter
 {
-    void operator()(SDL_Renderer* r) const noexcept { SDL_DestroyRenderer(r); }
+    void operator()(SDL_Renderer* r) const noexcept
+    {
+        SDL_Log("Destroying Renderer");
+        SDL_DestroyRenderer(r);
+    }
 };
 
 using WindowPtr = std::unique_ptr<SDL_Window, WindowDeleter>;
