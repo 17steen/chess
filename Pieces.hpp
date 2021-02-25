@@ -101,6 +101,8 @@ struct BoardInfo
         pk.value().pos = to; // make piece aware of the move
     }
 
+    void take(Position enemy_pos) { board[enemy_pos.x][enemy_pos.y] = -1; }
+
     // use alternative, will be used as a const way to get access to
     // pieces
     [[nodiscard]] constexpr std::optional<Piece> peek(
