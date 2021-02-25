@@ -2,10 +2,21 @@
 
 #include "Pieces.hpp"
 
+namespace MoveType {
+enum MoveType : uint8_t
+{
+    move,
+    take,
+    en_passant,
+    castle,
+};
+constexpr auto names = std::to_array({ "no", "take", "en_passant", "castle" });
+};
+
 struct Move
 {
     Position where;
-    bool takes;
+    MoveType::MoveType move_type;
 };
 
 using MoveContainer = std::vector<Move>;
