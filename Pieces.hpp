@@ -103,14 +103,20 @@ struct BoardInfo
 
     // use alternative, will be used as a const way to get access to
     // pieces
-    [[nodiscard]] std::optional<Piece> peek(int8_t const x,
-                                            int8_t const y) const noexcept
+    [[nodiscard]] constexpr std::optional<Piece> peek(
+      int8_t const x,
+      int8_t const y) const noexcept
     {
         auto const index = board[x][y];
         if (index == -1)
             return {};
         else
             return { pieces[index] };
+    }
+
+    [[nodiscard]] constexpr std::optional<Piece> peek(Position p) const noexcept
+    {
+        return peek(p.x, p.y);
     }
 
     [[nodiscard]] constexpr PeekResult get(int8_t const x,

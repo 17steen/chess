@@ -1,7 +1,8 @@
 #include "SDL.h"
 #include "SDL_image.h"
+#include "SDL_scancode.h"
+#include "SDL_video.h"
 
-#include <SDL_scancode.h>
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
@@ -111,6 +112,7 @@ struct Assets
     {
         for (auto const& arr : pieces) {
             for (auto* const ptr : arr) {
+                SDL_Log("Destroying Texture");
                 SDL_DestroyTexture(ptr);
             }
         }
@@ -259,7 +261,11 @@ struct WindowData
     inline auto get() { return win; }
     inline auto renderer() { return SDL_GetRenderer(win); }
 
-    ~WindowData() { SDL_DestroyWindow(win); }
+    ~WindowData()
+    {
+        SDL_Log("Destroying window");
+        SDL_DestroyWindow(win);
+    }
 };
 
 // TODO: pass in a struct has all necessary information on the window
@@ -326,6 +332,7 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
     bool run{ true };
 
     while (run) {
+        // SDL_WaitEvent(nullptr);
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
@@ -335,15 +342,20 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
 
                     // if i press F1 i should see all the previous
                     // states
-                case SDL_KEYDOWN: {
+                case SDL_KEYUP: {
                     switch (e.key.keysym.scancode) {
                         // debug
-                        case SDL_SCANCODE_F1: {
+                        case SDL_SCANCODE_H: {
+                            SDL_Log("Pressed H\n");
                             for (auto const& prev : game_data.history) {
                                 render_board(assets, prev, window_data);
                                 SDL_RenderPresent(main_renderer);
                                 SDL_Delay(500);
+                                SDL_Log("frame\n");
                             }
+                        } break;
+                        case SDL_SCANCODE_ESCAPE: {
+                            run = false;
                         } break;
 
                         default: {
@@ -368,70 +380,85 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
         if (not(mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) and
             prev_mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 
-            // if there is a selection and we are the right player
-            if (selection.has_value()) {
+            bool keep_checking;
+            do {
+                keep_checking = false;
 
-                auto const res = std::find_if(
-                  std::begin(moves), std::end(moves), [m_x, m_y](Move mv) {
-                      return mv.where.operator==({ m_x, m_y });
-                  });
+                // if there is a selection and we are the right player
+                if (selection.has_value()) {
 
-                // didn't click on a move
-                if (res == std::end(moves)) {
-                    // TODO: make this check one clicked on another valid piece
-                    // goto if it needs to
-                    selection.reset();
+                    auto const res = std::find_if(
+                      std::begin(moves), std::end(moves), [m_x, m_y](Move mv) {
+                          return mv.where.operator==({ m_x, m_y });
+                      });
 
-                    // player clicked on a move
-                } else { // TODO: handle clicked on a valid move
-                    SDL_Log("valid move ! %s\n",
-                            res->takes ? "takes" : "doesn't take");
-                    auto const& [where, takes] = *res;
+                    // didn't click on a move
+                    if (res == std::end(moves)) {
+                        // in case you click away from a move, and hit another
+                        // piece, no need to double click.
+                        keep_checking = true;
+                        selection.reset();
 
-                    // TODO: make this readable
-                    // means that the pawn just moved two tiles
-                    if (selection.value().type == PieceType::pawn and
-                        std::abs(where.y - selection.value().pos.y) == 2) {
-                        selection.value().special = true;
-                        SDL_Log("pawn moved two tiles\n");
+                        // player clicked on a move
+                    } else { // TODO: handle clicked on a valid move
+                        SDL_Log("valid move ! %s\n",
+                                res->move_type ? "takes" : "doesn't take");
+                        auto const& [where, takes] = *res;
+
+                        game_data.save();
+
+                        // MUTATES GAME DATA
+                        //  take piece
+                        switch (takes) {
+                            using namespace MoveType;
+                            case move: {
+                                board.move(selection, where);
+                            } break;
+                            case take: {
+                                // get piece at that position, then mark it as
+                                // dead
+                                auto& target_piece = board.get(where).value();
+                                target_piece.alive = false;
+
+                                if (target_piece.type == PieceType::king) {
+                                    SDL_Log(
+                                      "%s won.\n",
+                                      Colour::names[selection.value().colour]);
+                                }
+
+                                board.move(selection, where);
+
+                            } break;
+                            case en_passant: {
+                                SDL_Log("En passant unimplemented!");
+                            } break;
+                            case castle: {
+                            } break;
+                        }
+
+                        board.switch_turn();
+                        selection.reset();
                     }
 
-                    game_data.save();
-
-                    // MUTATES GAME DATA
-                    //  take piece
-                    if (takes) {
-                        // get piece at that position, then mark it as dead
-                        board.get(where).value().alive = false;
-                        board.move(selection, where);
-
-                    } else {
-                        board.move(selection, where);
-                    }
-
-                    board.switch_turn();
-                    selection.reset();
-                }
-
-                // nothing valid was selected
-            } else {
-
-                auto piece_selected = board.get(m_x, m_y);
-
-                SDL_Log("clicked on %d : %d\n", m_x, m_y);
-
-                if (piece_selected.has_value() and
-                    piece_selected.value().colour == board.player()) {
-                    SDL_Log("Selected : %s %s\n",
-                            Colour::names[piece_selected.value().colour],
-                            PieceType::names[piece_selected.value().type]);
-
-                    selection = piece_selected;
-                    moves = get_moves(piece_selected.value(), game_data);
+                    // nothing valid was selected
                 } else {
-                    selection.reset();
+                    auto piece_selected = board.get(m_x, m_y);
+
+                    SDL_Log("clicked on %d : %d\n", m_x, m_y);
+
+                    if (piece_selected.has_value() and
+                        piece_selected.value().colour == board.player()) {
+                        SDL_Log("Selected : %s %s\n",
+                                Colour::names[piece_selected.value().colour],
+                                PieceType::names[piece_selected.value().type]);
+
+                        selection = piece_selected;
+                        moves = get_moves(piece_selected.value(), game_data);
+                    } else {
+                        selection.reset();
+                    }
                 }
-            }
+            } while (keep_checking);
         }
 
         SDL_RenderClear(main_renderer);
@@ -440,7 +467,7 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
             for (auto const move : moves) {
                 tile.x = move.where.x * tile_width;
                 tile.y = move.where.y * tile_height;
-                if (not move.takes) {
+                if (not move.move_type) {
                     SDL_SetRenderDrawColor(main_renderer, 0, 100, 200, 200);
                 } else {
                     SDL_SetRenderDrawColor(main_renderer, 0, 200, 100, 200);
@@ -450,7 +477,6 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
         }
 
         SDL_RenderPresent(main_renderer);
-        SDL_WaitEvent(nullptr);
 
         prev_mouse_state = mouse_state;
     }
@@ -466,8 +492,8 @@ main(int const argc, char const* const* const argv)
 
     auto main_window =
       WindowData{ .win = SDL_CreateWindow("Chess game",
-                                          SDL_WINDOWPOS_CENTERED,
-                                          SDL_WINDOWPOS_CENTERED,
+                                          SDL_WINDOWPOS_UNDEFINED,
+                                          SDL_WINDOWPOS_UNDEFINED,
                                           width,
                                           height,
                                           SDL_WINDOW_RESIZABLE) };
