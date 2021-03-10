@@ -305,6 +305,9 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
 
     BoardInfo::PeekResult selection{};
 
+    // while SDL cursor takes an int, i find this more explicit
+    SDL_ShowCursor(SDL_DISABLE);
+
     bool run{ true };
 
     while (run) {
@@ -469,10 +472,15 @@ game(Assets const& assets, GameData& game_data, WindowData& window_data)
             }
         }
 
+        SDL_Rect cursor_rect{ .x = mouse_x, .y = mouse_y, .w = 50, .h = 50 };
+        SDL_RenderCopy(main_renderer, assets.cursor, nullptr, &cursor_rect);
         SDL_RenderPresent(main_renderer);
 
         prev_mouse_state = mouse_state;
     }
+
+    // while SDL cursor takes an int, i find this more explicit
+    SDL_ShowCursor(SDL_ENABLE);
 }
 
 int
@@ -483,13 +491,14 @@ main(int const argc, char const* const* const argv)
 
     SDL2 sdl2_runtime{ SDL_INIT_VIDEO };
 
-    auto main_window =
-      WindowData{ .win = SDL_CreateWindow("Chess game",
-                                          SDL_WINDOWPOS_UNDEFINED,
-                                          SDL_WINDOWPOS_UNDEFINED,
-                                          width,
-                                          height,
-                                          SDL_WINDOW_RESIZABLE) };
+    auto main_window = WindowData{
+        .win = SDL_CreateWindow("Chess game",
+                                SDL_WINDOWPOS_UNDEFINED,
+                                SDL_WINDOWPOS_UNDEFINED,
+                                width,
+                                height,
+                                SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL)
+    };
 
     check_sdl_failure(not main_window.get(), "Window creation");
 
